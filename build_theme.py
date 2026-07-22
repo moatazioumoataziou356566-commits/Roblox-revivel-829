@@ -1,0 +1,70 @@
+import os
+import glob
+import zipfile
+from PIL import Image
+
+BUILD_DIR = "theme_structure"
+OUTPUT_MTZ = "IOS7_Theme.mtz"
+SUPPORTED_EXTENSIONS = ['*.jpg', '*.jpeg', '*.png', '*.webp', '*.JPG', '*.PNG']
+
+def find_input_image():
+    """البحث عن أول صورة متوفرة في المستودع تلقائياً"""
+    for ext in SUPPORTED_EXTENSIONS:
+        files = glob.glob(ext)
+        if files:
+            print(f"[+] تم العثور على الصورة: {files[0]}")
+            return files[0]
+    return None
+
+def prepare_wallpaper():
+    """تعديل أبعاد الصورة المعثور عليها لتصبح خلفية"""
+    image_path = find_input_image()
+    
+    if not image_path:
+        print("[-] لم يتم العثور على أي صورة في الجذر الرئيسي للمستودع!")
+        return False
+
+    with Image.open(image_path) as img:
+        # تحديد فلتر إعادة التجميل بأسلوب متوافق مع كافة إصدارات Pillow
+        resample_filter = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', Image.LANCZOS)
+        img_resized = img.resize((1080, 1920), resample_filter)
+        
+        wallpaper_dir = os.path.join(BUILD_DIR, "wallpaper")
+        os.makedirs(wallpaper_dir, exist_ok=True)
+        
+        # حفظ الصورة المجهزة داخل بنية الثيم
+        img_resized.convert("RGB").save(os.path.join(wallpaper_dir, "default_wallpaper.jpg"), "JPEG")
+        print("[+] تم تجهيز الخلفية بنجاح.")
+        return True
+
+def create_mtz():
+    """تجميع عناصر الثيم وإخراج ملف .mtz"""
+    if not os.path.exists(BUILD_DIR):
+        os.makedirs(BUILD_DIR)
+
+    desc_content = """<?xml version="1.0" encoding="UTF-8"?>
+<userTheme>
+    <title>iOS 7 Auto Theme</title>
+    <designer>Automated Builder</designer>
+    <author>GitHub Action</author>
+    <version>1.0.0</version>
+</userTheme>"""
+
+    with open(os.path.join(BUILD_DIR, "description.xml"), "w", encoding="utf-8") as f:
+        f.write(desc_content)
+
+    with zipfile.ZipFile(OUTPUT_MTZ, "w", zipfile.ZIP_DEFLATED) as mtz:
+        for root, _, files in os.walk(BUILD_DIR):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, BUILD_DIR)
+                mtz.write(file_path, arcname)
+                
+    print(f"[+] تم إنشاء ملف الثيم: {OUTPUT_MTZ}")
+
+if __name__ == "__main__":
+    if prepare_wallpaper():
+        create_mtz()
+    else:
+        print("[-] توقفت العملية لعدم وجود صورة.")
+        
