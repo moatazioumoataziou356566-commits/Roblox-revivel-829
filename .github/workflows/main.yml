@@ -1,6 +1,6 @@
 import os
-import zipfile
 import glob
+import zipfile
 from PIL import Image
 
 BUILD_DIR = "theme_structure"
@@ -25,8 +25,9 @@ def prepare_wallpaper():
         return False
 
     with Image.open(image_path) as img:
-        # تحويل الصورة إلى الأبعاد القياسية للهاتف (1080x1920)
-        img_resized = img.resize((1080, 1920), Image.Resampling.LANCZOS)
+        # تحديد فلتر إعادة التجميل بأسلوب متوافق مع كافة إصدارات Pillow
+        resample_filter = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', Image.LANCZOS)
+        img_resized = img.resize((1080, 1920), resample_filter)
         
         wallpaper_dir = os.path.join(BUILD_DIR, "wallpaper")
         os.makedirs(wallpaper_dir, exist_ok=True)
@@ -41,19 +42,17 @@ def create_mtz():
     if not os.path.exists(BUILD_DIR):
         os.makedirs(BUILD_DIR)
 
-    # ملف وصف الثيم لـ MIUI / HyperOS
     desc_content = """<?xml version="1.0" encoding="UTF-8"?>
 <userTheme>
     <title>iOS 7 Auto Theme</title>
     <designer>Automated Builder</designer>
     <author>GitHub Action</author>
     <version>1.0.0</version>
-</userTheme>
-"""
+</userTheme>"""
+
     with open(os.path.join(BUILD_DIR, "description.xml"), "w", encoding="utf-8") as f:
         f.write(desc_content)
 
-    # ضغط الملفات إلى صيغة .mtz
     with zipfile.ZipFile(OUTPUT_MTZ, "w", zipfile.ZIP_DEFLATED) as mtz:
         for root, _, files in os.walk(BUILD_DIR):
             for file in files:
@@ -68,3 +67,4 @@ if __name__ == "__main__":
         create_mtz()
     else:
         print("[-] توقفت العملية لعدم وجود صورة.")
+
